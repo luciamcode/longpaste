@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="ja">
+<!DOCTYPE html>
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,12 +9,16 @@
     body { font-family: sans-serif; padding: 1rem; }
     #tabs { margin-bottom: 0.5rem; }
     #tab-list { list-style: none; padding: 0; display: flex; gap: 0.5rem; }
-    #tab-list li { padding: 0.5rem 1rem; background: #eee; border-radius: 4px; cursor: pointer; position: relative; user-select: none; }
-    #tab-list li.active { background: #cce; }
-    #tab-list li .delete-btn { position: absolute; top: -8px; right: -8px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 14px; cursor: pointer; }
-    #editor { width: 100%; height: 60vh; padding: 0.5rem; font-size: 1rem; }
+    #tab-list li { padding: 0.5rem 1rem; background: #444; color: #fff; border-radius: 4px; cursor: pointer; position: relative; user-select: none; }
+    #tab-list li.active { background: #666; }
+    #tab-list li .delete-btn { position: absolute; top: -6px; right: -6px; background: #888; color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 12px; cursor: pointer; display: none; }
+    #tab-list li:hover .delete-btn { display: block; }
+    #editor { width: 100%; height: 60vh; padding: 0.5rem; font-size: 1rem; background: #222; color: #fff; border: none; border-radius: 4px; }
     #controls { margin-top: 0.5rem; }
-    button, input[type="text"], input[type="file"] { margin-right: 0.5rem; padding: 0.5rem 1rem; border: none; border-radius: 4px; font-size: 1rem; }
+    button, input[type="text"], input[type="file"] { margin-right: 0.5rem; padding: 0.5rem 1rem; border: none; border-radius: 4px; font-size: 1rem; background: #555; color: #fff; cursor: pointer; }
+    button:hover, input[type="text"]:focus { background: #777; }
+    .toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 0.5rem 1rem; border-radius: 4px; z-index: 1000; opacity: 0; transition: opacity .3s; }
+    .toast.show { opacity: 1; }
   </style>
 </head>
 <body>
@@ -21,120 +26,99 @@
     <ul id="tab-list"></ul>
     <input type="text" id="tab-name-input" placeholder="タブ名を入力..." />
     <button id="new-tab">＋タブ作成</button>
-  </div>  <div id="controls">
+  </div>
+  <textarea id="editor" placeholder="ここに長文を入力..."></textarea>
+  <div id="controls">
     <button id="save">保存</button>
     <button id="share">Gistで共有</button>
     <input type="file" id="import-file" accept=".txt" />
-  </div>  <textarea id="editor" placeholder="ここに長文を入力..."></textarea>  <script type="module">
-    import { saveTab, loadTab, listTabs, deleteTab } from './indexeddb-utils.js';
+  </div>
 
+  <script type="module">
+    // トースト通知
+    function toast(msg) {
+      const el = document.createElement('div');
+      el.className = 'toast';
+      el.textContent = msg;
+      document.body.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('show'));
+      setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2000);
+    }
+
+    import { saveTab, loadTab, listTabs, deleteTab } from './indexeddb-utils.js';
     let currentTabId = null;
     let tabNames = JSON.parse(localStorage.getItem('tabNames') || '{}');
 
     async function renderTabs() {
       const ids = await listTabs();
-      const ul = document.getElementById('tab-list');
-      ul.innerHTML = '';
+      const ul = document.getElementById('tab-list'); ul.innerHTML = '';
       ids.forEach(id => {
         const li = document.createElement('li');
         li.textContent = tabNames[id] || id;
         li.dataset.id = id;
-        if (id === currentTabId) li.classList.add('active');
-
         li.ondblclick = () => {
           const newName = prompt('新しいタブ名を入力:', tabNames[id] || id);
-          if (newName) {
-            tabNames[id] = newName;
-            localStorage.setItem('tabNames', JSON.stringify(tabNames));
-            renderTabs();
-          }
+          if (newName) { tabNames[id] = newName; localStorage.setItem('tabNames', JSON.stringify(tabNames)); renderTabs(); }
         };
-
-        const del = document.createElement('button');
-        del.textContent = '×';
-        del.className = 'delete-btn';
-        del.onclick = async (e) => {
-          e.stopPropagation();
-          if (confirm('このタブを削除しますか？')) {
-            await deleteTab(id);
-            delete tabNames[id];
-            localStorage.setItem('tabNames', JSON.stringify(tabNames));
-            if (currentTabId === id) currentTabId = null;
-            await loadOrCreateTab();
-          }
-        };
+        const del = document.createElement('button'); del.textContent = '×'; del.className = 'delete-btn';
+        del.onclick = async e => { e.stopPropagation(); if (confirm('このタブを削除しますか？')) { await deleteTab(id); delete tabNames[id]; localStorage.setItem('tabNames', JSON.stringify(tabNames)); if (currentTabId === id) currentTabId = null; await loadOrCreateTab(); }};
         li.appendChild(del);
-
         li.onclick = () => selectTab(id);
+        li.setAttribute('draggable', 'true');
         ul.appendChild(li);
       });
     }
 
     async function selectTab(id) {
-      currentTabId = id;
-      window.location.hash = id;
-      await renderTabs();
-      document.getElementById('editor').value = await loadTab(id);
+      currentTabId = id; window.location.hash = id; await renderTabs(); document.getElementById('editor').value = await loadTab(id);
     }
 
     async function createNewTab() {
-      const nameInput = document.getElementById('tab-name-input');
-      const name = nameInput.value.trim() || `タブ-${Date.now()}`;
-      nameInput.value = '';
-      const id = Date.now().toString();
-      tabNames[id] = name;
-      localStorage.setItem('tabNames', JSON.stringify(tabNames));
-      await saveTab(id, '');
-      selectTab(id);
+      const input = document.getElementById('tab-name-input');
+      const name = input.value.trim() || `タブ-${Date.now()}`; input.value = '';
+      const id = Date.now().toString(); tabNames[id] = name; localStorage.setItem('tabNames', JSON.stringify(tabNames));
+      await saveTab(id, ''); selectTab(id);
     }
 
     async function loadOrCreateTab() {
-      const ids = await listTabs();
-      const hashId = location.hash.replace('#', '');
+      const ids = await listTabs(); const hashId = location.hash.replace('#', '');
       if (hashId && ids.includes(hashId)) currentTabId = hashId;
       else if (ids.length > 0) currentTabId = ids[0];
-      if (!currentTabId) await createNewTab();
-      else await selectTab(currentTabId);
+      if (!currentTabId) await createNewTab(); else await selectTab(currentTabId);
     }
 
     window.addEventListener('load', async () => {
       await loadOrCreateTab();
-
       // ファイルインポート
-      document.getElementById('import-file').addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const text = await file.text();
-        document.getElementById('editor').value = text;
+      document.getElementById('import-file').addEventListener('change', async e => {
+        const file = e.target.files[0]; if (!file) return;
+        document.getElementById('editor').value = await file.text();
       });
-
-      // タブ並び替え（ドラッグ＆ドロップ）
-      const ul = document.getElementById('tab-list');
-      let dragged;
-      ul.addEventListener('dragstart', e => { dragged = e.target; e.target.style.opacity = .5; });
-      ul.addEventListener('dragend', e => { e.target.style.opacity = ''; });
-      ul.addEventListener('dragover', e => { e.preventDefault(); });
+      // タブ並び替え
+      const ul = document.getElementById('tab-list'); let dragged;
+      ul.addEventListener('dragstart', e => { if(e.target.tagName==='LI'){ dragged=e.target; e.target.style.opacity='.5'; }});
+      ul.addEventListener('dragend', e => { if(e.target.tagName==='LI')e.target.style.opacity=''; });
+      ul.addEventListener('dragover', e => e.preventDefault());
       ul.addEventListener('drop', e => {
-        e.preventDefault();
-        if (e.target.tagName === 'LI' && dragged !== e.target) {
-          ul.insertBefore(dragged, e.target.nextSibling);
-        }
-      });
-
+        e.preventDefault(); if(e.target.tagName==='LI'&&dragged&&dragged!==e.target){ ul.insertBefore(dragged, e.target.nextSibling);} });
       document.getElementById('new-tab').onclick = createNewTab;
-      document.getElementById('save').onclick = async () => { await saveTab(currentTabId, document.getElementById('editor').value); alert('保存しました'); };
+      document.getElementById('save').onclick = async () => { await saveTab(currentTabId, document.getElementById('editor').value); toast('保存しました'); };
       document.getElementById('share').onclick = async () => {
-        const content = document.getElementById('editor').value;
-        const res = await fetch('/api/create-gist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) });
-        const { html_url } = await res.json();
-        await navigator.clipboard.writeText(html_url);
-        alert('Gist共有リンクをコピーしました:\n' + html_url);
+        try {
+          const content = document.getElementById('editor').value;
+          const res = await fetch('/api/create-gist', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ content }) });
+          if (!res.ok) throw new Error(`Status ${res.status}`);
+          const { html_url } = await res.json();
+          await navigator.clipboard.writeText(html_url);
+          toast('Gistリンクをコピーしました');
+        } catch (e) { console.error('Share error', e); toast('共有エラー: '+e.message); }
       };
-
-      // PWA サービスワーカー登録
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js');
-      }
+      // PWA Service Worker
+      if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
     });
-  </script></body>
+  </script>
+</body>
 </html>
+
+
+
