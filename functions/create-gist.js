@@ -1,29 +1,29 @@
-document.getElementById('share').onclick = async () => {
-  const content = document.getElementById('editor').value.trim();
-  if (!content) {
-    alert('共有するテキストが空です！');
-    return;
-  }
+// ✅ Node.js形式（＝サーバー側）
+const fetch = require('node-fetch');
 
-  try {
-    const res = await fetch('/api/create-gist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content })
-    });
+exports.handler = async function(event, context) {
+  const { content } = JSON.parse(event.body);
 
-    if (!res.ok) {
-      const msg = await res.text();
-      alert('Gist作成に失敗しました: ' + msg);
-      return;
-    }
+  const res = await fetch("https://api.github.com/gists", {
+    method: "POST",
+    headers: {
+      "Authorization": `token ${process.env.GITHUB_TOKEN}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      description: "Shared via TinyViewer",
+      public: false,
+      files: {
+        "shared.txt": {
+          content
+        }
+      }
+    })
+  });
 
-    const data = await res.json();
-    const html_url = data?.html_url || '(URL取得失敗)';
-    await navigator.clipboard.writeText(html_url);
-    alert('Gist共有リンクをコピーしました:\n' + html_url);
-  } catch (err) {
-    console.error(err);
-    alert('エラーが発生しました: ' + err.message);
-  }
+  const data = await res.json();
+  return {
+    statusCode: 200,
+    body: JSON.stringify(data)
+  };
 };
