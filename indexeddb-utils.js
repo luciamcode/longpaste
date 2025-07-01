@@ -45,3 +45,15 @@ export async function listTabs() {
     req.onerror = e => rej(e);
   });
 }
+
+
+// 既存の export のあとに追記
+export async function deleteTab(id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = e => reject(e);
+  });
+}
