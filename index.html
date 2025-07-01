@@ -3,6 +3,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>長文対応テキストペーストサイト</title>
+  <link rel="manifest" href="/manifest.json">
   <style>
     body { font-family: sans-serif; padding: 1rem; }
     #tabs { margin-bottom: 0.5rem; }
@@ -12,7 +13,7 @@
     #tab-list li .delete-btn { position: absolute; top: -8px; right: -8px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 14px; cursor: pointer; }
     #editor { width: 100%; height: 60vh; padding: 0.5rem; font-size: 1rem; }
     #controls { margin-top: 0.5rem; }
-    button, input[type="text"] { margin-right: 0.5rem; padding: 0.5rem 1rem; border: none; border-radius: 4px; font-size: 1rem; }
+    button, input[type="text"], input[type="file"] { margin-right: 0.5rem; padding: 0.5rem 1rem; border: none; border-radius: 4px; font-size: 1rem; }
   </style>
 </head>
 <body>
@@ -20,12 +21,11 @@
     <ul id="tab-list"></ul>
     <input type="text" id="tab-name-input" placeholder="タブ名を入力..." />
     <button id="new-tab">＋タブ作成</button>
-  </div>
-  <textarea id="editor" placeholder="ここに長文を入力..."></textarea>
-  <div id="controls">
+  </div>  <div id="controls">
     <button id="save">保存</button>
     <button id="share">Gistで共有</button>
-  </div>  <script type="module">
+    <input type="file" id="import-file" accept=".txt" />
+  </div>  <textarea id="editor" placeholder="ここに長文を入力..."></textarea>  <script type="module">
     import { saveTab, loadTab, listTabs, deleteTab } from './indexeddb-utils.js';
 
     let currentTabId = null;
@@ -41,7 +41,6 @@
         li.dataset.id = id;
         if (id === currentTabId) li.classList.add('active');
 
-        // ダブルクリックで名前編集
         li.ondblclick = () => {
           const newName = prompt('新しいタブ名を入力:', tabNames[id] || id);
           if (newName) {
@@ -51,7 +50,6 @@
           }
         };
 
-        // 削除ボタン
         const del = document.createElement('button');
         del.textContent = '×';
         del.className = 'delete-btn';
@@ -102,19 +100,20 @@
     window.addEventListener('load', async () => {
       await loadOrCreateTab();
 
-      // 並び替え（ドラッグ＆ドロップ）
+      // ファイルインポート
+      document.getElementById('import-file').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const text = await file.text();
+        document.getElementById('editor').value = text;
+      });
+
+      // タブ並び替え（ドラッグ＆ドロップ）
       const ul = document.getElementById('tab-list');
       let dragged;
-      ul.addEventListener('dragstart', e => {
-        dragged = e.target;
-        e.target.style.opacity = .5;
-      });
-      ul.addEventListener('dragend', e => {
-        e.target.style.opacity = '';
-      });
-      ul.addEventListener('dragover', e => {
-        e.preventDefault();
-      });
+      ul.addEventListener('dragstart', e => { dragged = e.target; e.target.style.opacity = .5; });
+      ul.addEventListener('dragend', e => { e.target.style.opacity = ''; });
+      ul.addEventListener('dragover', e => { e.preventDefault(); });
       ul.addEventListener('drop', e => {
         e.preventDefault();
         if (e.target.tagName === 'LI' && dragged !== e.target) {
@@ -123,21 +122,19 @@
       });
 
       document.getElementById('new-tab').onclick = createNewTab;
-      document.getElementById('save').onclick = async () => {
-        await saveTab(currentTabId, document.getElementById('editor').value);
-        alert('保存しました');
-      };
+      document.getElementById('save').onclick = async () => { await saveTab(currentTabId, document.getElementById('editor').value); alert('保存しました'); };
       document.getElementById('share').onclick = async () => {
         const content = document.getElementById('editor').value;
-        const res = await fetch('/api/create-gist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content })
-        });
+        const res = await fetch('/api/create-gist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) });
         const { html_url } = await res.json();
         await navigator.clipboard.writeText(html_url);
         alert('Gist共有リンクをコピーしました:\n' + html_url);
       };
+
+      // PWA サービスワーカー登録
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js');
+      }
     });
   </script></body>
 </html>
