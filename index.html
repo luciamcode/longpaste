@@ -1,5 +1,4 @@
-<!DOCTYPE html>
-<html lang="ja">
+<!DOCTYPE html><html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -32,9 +31,7 @@
     <button id="save">保存</button>
     <button id="share">Gistで共有</button>
     <input type="file" id="import-file" accept=".txt" />
-  </div>
-
-  <script type="module">
+  </div>  <script type="module">
     // トースト通知
     function toast(msg) {
       const el = document.createElement('div');
@@ -116,9 +113,5 @@
       // PWA Service Worker
       if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
     });
-  </script>
-</body>
+  </script></body>
 </html>
-
-
-
