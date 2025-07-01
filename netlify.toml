@@ -1,3 +1,6 @@
+[functions]
+  directory = "functions"
+
 [[redirects]]
   from = "/api/create-gist"
   to = "/.netlify/functions/create-gist"
