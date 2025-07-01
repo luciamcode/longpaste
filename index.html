@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>長文対応テキストペーストサイト</title>
+  <style>
+    body { font-family: sans-serif; padding: 1rem; }
+    #tabs { margin-bottom: 0.5rem; }
+    #tab-list { list-style: none; padding: 0; display: flex; gap: 0.5rem; }
+    #tab-list li { padding: 0.5rem 1rem; background: #eee; border-radius: 4px; cursor: pointer; }
+    #tab-list li.active { background: #cce; }
+    #editor { width: 100%; height: 60vh; padding: 0.5rem; font-size: 1rem; }
+    #controls { margin-top: 0.5rem; }
+    button { margin-right: 0.5rem; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="tabs">
+    <ul id="tab-list"></ul>
+    <button id="new-tab">＋タブ作成</button>
+  </div>
+  <textarea id="editor" placeholder="ここに長文を入力..."></textarea>
+  <div id="controls">
+    <button id="save">保存</button>
+    <button id="share">Gistで共有</button>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
